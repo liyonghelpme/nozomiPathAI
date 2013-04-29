@@ -1,0 +1,4 @@
+配置windows工程可以在 本机器上编译
+避免循环依赖问题
+liblua 代码
+cocoslua 代码放到 nozomi工程里面

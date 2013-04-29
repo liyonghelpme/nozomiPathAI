@@ -56,10 +56,10 @@ function World:initCell()
         end
     end
     for i = 0, self.cellNum+1, 1 do
-        self.cells[0*self.coff+i] = {state='Wall', fScore=nil, gScore=nil, hScore=nil, parent=nil}
-        self.cells[i*self.coff+0] = {state='Wall', fScore=nil, gScore=nil, hScore=nil, parent=nil}
-        self.cells[(self.cellNum+1)*self.coff+i] = {state='Wall', fScore=nil, gScore=nil, hScore=nil, parent=nil}
-        self.cells[i*self.coff+(self.cellNum+1)] = {state='Wall', fScore=nil, gScore=nil, hScore=nil, parent=nil}
+        self.cells[0*self.coff+i] = {state='SOLID', fScore=nil, gScore=nil, hScore=nil, parent=nil}
+        self.cells[i*self.coff+0] = {state='SOLID', fScore=nil, gScore=nil, hScore=nil, parent=nil}
+        self.cells[(self.cellNum+1)*self.coff+i] = {state='SOLID', fScore=nil, gScore=nil, hScore=nil, parent=nil}
+        self.cells[i*self.coff+(self.cellNum+1)] = {state='SOLID', fScore=nil, gScore=nil, hScore=nil, parent=nil}
     end
 end
 function World:putStart(x, y)
@@ -81,6 +81,7 @@ function World:clearGrids(x, y, size)
 	end
 end
 
+--陷阱 城墙 装饰
 function World:setGrids(x, y, size)
 	for i=1, size do
 		for j=1, size do
@@ -93,6 +94,7 @@ local function compareDis(a, b)
 	return a[1] < b[1]
 end
 
+--普通 建筑物 
 function World:setBuild(x, y, size, btype, obj)
 	local fsize = (size-1)/2
 	local cp = {x+fsize, y+fsize}
@@ -113,7 +115,7 @@ function World:setBuild(x, y, size, btype, obj)
 					elseif dy>=0 then
 						dis = dy
 					else
-						self.cells[self:getKey(i, j)]['state'] = 'Wall'
+						self.cells[self:getKey(i, j)]['state'] = 'Building'
 					end
 					if dis then
 						local prevGrid = self.prevGrids[self:getKey(i, j)]
@@ -130,6 +132,7 @@ function World:setBuild(x, y, size, btype, obj)
 	end
 end
 
+--清理建筑物的网格
 function World:clearBuild(x, y, size, btype, obj)
 	local fsize = (size-1)/2
 	local cp = {x+fsize, y+fsize}
@@ -172,9 +175,14 @@ function World:calcG(x, y)
     local difX = math.abs(math.floor(parent/self.coff)-x)
     local difY = math.abs(parent%self.coff-y)
     local dist = 10
-    if difX > 0 and difY > 0 then
-        dist = 10
+    -- 经营页面绕不过去城墙的时候 士兵可以穿过城墙
+    --当前可以绕过5个城墙
+    if data['state'] == 'Wall' then
+        dist = 50
+    elseif difX > 0 and difY > 0 then
+        dist = 14
     end
+
     data['gScore'] = self.cells[parent]['gScore']+dist
 end
 function World:calcH(x, y, bx, by)
@@ -202,6 +210,7 @@ function World:pushQueue(x, y)
     self.pqDict[fScore] = fDict
 end
 
+--检测邻居节点 城墙可以穿过去 普通建筑不可以
 function World:checkNeibor(x, y)
     local neibors = {
         {x-1, y-1},
@@ -216,7 +225,8 @@ function World:checkNeibor(x, y)
 
     for n, nv in ipairs(neibors) do
         local key = self:getKey(nv[1], nv[2]) 
-        if self.cells[key]['state'] ~= 'Wall' and self.closedList[key] == nil then
+        --对于城墙value+5
+        if self.closedList[key] == nil and self.cells[key]['state'] ~= 'SOLID' and self.cells[key]['state'] ~= 'Building'  then
             -- 检测是否已经在 openList 里面了
             local nS = self.cells[key]['fScore']
             local inOpen = false

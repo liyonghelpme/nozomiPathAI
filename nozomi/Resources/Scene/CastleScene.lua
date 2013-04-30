@@ -42,9 +42,11 @@ function CastleScene:ctor()
 	
     self.mapGrid = RhombGrid.new(GRIDSIZEX, GRIDSIZEY, GRIDOFFX, GRIDOFFY)
     self.mapGrid:setLimit(GridKeys.Build, 1, 40)
-	local w = World.new(84, 1000)
+	
+    local w = World.new(84, 1000)
 	w:initCell()
 	self.mapWorld = w
+    self.mapWorld:setScene(self)
 
     self.updateEntry = nil
 end

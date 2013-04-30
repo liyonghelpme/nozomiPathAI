@@ -162,6 +162,8 @@ function Person:resetPersonView()
 	end
 end
 
+--检测非相邻点之间是否存在障碍物
+--将坐标从affine网格坐标转化成笛卡尔坐标
 function Person:getTruePath(path, world, mapGrid, fx, fy, tx, ty)
 	local i = 1
     local j = 3
@@ -178,7 +180,11 @@ function Person:getTruePath(path, world, mapGrid, fx, fy, tx, ty)
         end
     end
     table.insert(tempPath, path[#path])
+    --设定world中网格属性用于调试
     path = tempPath
+    for i=1, #path, 1 do
+        world.cells[world:getKey(path[i][1], path[i][2])]['isReal'] = true
+    end
 	    
 	local truePath = {}
 	if #path==0 then
@@ -187,14 +193,6 @@ function Person:getTruePath(path, world, mapGrid, fx, fy, tx, ty)
 	local curGrid = path[1]
 	for i=2, #path-1 do
 		local grid = path[i]
-		--local ox, oy = grid[1] - curGrid[1], grid[2] - curGrid[2]
-		--local direction = 3 + (2-oy)*((ox<=0 and 1) or -1)
-		--grid.direction = direction
-		--if direction%2~=0 then
-		--	local position = mapGrid.convertToPosition(grid[1]-ox/2, grid[2]+(2-oy)/2, 1, 1)
-			--table.insert(truePath, {position[1], position[2]})
-		--end
-		--curGrid = grid
 		local position = mapGrid:convertToPosition(grid[1]/2, grid[2]/2)
 		table.insert(truePath, {position[1], position[2]+mapGrid.sizeY/4})
 	end
@@ -215,6 +213,7 @@ function Person:setMoveTarget(tx, ty)
 		w:putStart(startPoint[1], startPoint[2])
 		w:putEnd(endPoint[1], endPoint[2])
 		local path = w:search(startPoint, endPoint)
+        --local truePath = path
 		local truePath = self:getTruePath(path, w, self.scene.mapGrid, fx, fy, tx, ty)
 		local firstPoint = table.remove(truePath, 1)
 		self.stateInfo = {movePath = truePath}

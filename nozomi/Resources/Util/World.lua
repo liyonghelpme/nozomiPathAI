@@ -47,6 +47,11 @@ function World:ctor(cellNum, coff)
     self.passTime = 0
     self.frameRate = 0.016
 
+    --经营场景
+    self.scene = nil
+end
+function World:setScene(s)
+    self.scene = s
 end
 --更新搜索状态 每固定时间 限制寻路的士兵数量
 function World:update(dt)
@@ -55,23 +60,72 @@ function World:update(dt)
     self.searchNum = 0
 end
 --showGrid 显示每个网格的值
+--只用于测试
+--坐标变换  
+--笛卡尔坐标 ---- 正则网格坐标 ---- 仿射网格坐标
+--      nx = rount(x/46)  ny = round(y/34.5)            dx = RoundInt((nx+ny)/2) dy = RoundInt((ny-nx)/2) 
+--      x = nx*46  y = ny*34.5            nx = dx-dy  ny = dx+dy
+
+--得到最近的整数
+function round(x)
+    return math.floor(x+0.5)
+end
+function cartesianToNormal(x, y)
+    return round(x/23), round(y/17.25)
+end
+function normalToAffine(nx, ny)
+    return round((nx+ny)/2), round((ny-nx)/2)
+end
+function normalToCartesian(nx, ny)
+    return nx*23, ny*17.25
+end
+function affineToNormal(dx, dy)
+    return dx-dy, dx+dy
+end
+--我的affine坐标和梁浩然游戏内部的坐标的 x y 方向相反了 
+
 function World:showGrid()
+    -- 0 0 坐标点位置
+    local zx = 2080
+    local zy = 195
+
     if self.calGrid ~= nil then
         self.calGrid:removeFromParentAndCleanup(true)
         self.calGrid = nil
     end
     self.calGrid = CCNode:create()
+    self.calGrid:setPosition(0, 0)
     for x = 1, self.cellNum, 1 do
         for y = 1, self.cellNum, 1 do
             local key = self:getKey(x, y)
             if self.cells[key]['fScore'] ~= nil then
-                local temp = CCLabelTTF:create(self.cells[key]['fScore'].."", "Arial", 10)
+                --local temp = CCLabelTTF:create(self.cells[key]['fScore'].."", "Arial", 10)
+                local temp = CCSprite:create("block.png")
+                if self.cells[key]['isPath'] and not self.cells[key]['isReal'] then
+                    temp:setColor(ccc3(0, 255, 0))
+                elseif self.cells[key]['isReal'] then
+                    temp:setColor(ccc3(0, 0, 255))
+                elseif self.cells[key]['state'] ~= nil then
+                    temp:setColor(ccc3(0, 255, 255))
+                end
+                temp:setOpacity(128)
+                local cs = temp:getContentSize()
+                temp:setScaleX(46/cs.width)
+                temp:setScaleY(34.5/cs.height)
                 self.calGrid:addChild(temp)
-                temp:setPosition(x*40, y*40)
+                local word = CCLabelTTF:create(""..self.cells[key]['fScore'], "Arial", 20)
+                word:setColor(ccc3(255, 0, 0))
+                word:setPosition(23, 17.5)
+                word:setAnchorPoint(ccp(0.5, 0.5))
+                temp:addChild(word)
+                --我的坐标x y 轴 和 游戏中的 x y 轴相反
+                local nx, ny = affineToNormal(y, x)
+                local px, py = normalToCartesian(nx, ny)
+                temp:setPosition(px+zx, py+zy+17.25)
             end
         end
     end
-    CCDirector:sharedDirector():getRunningScene():addChild(self.calGrid)
+    self.scene.ground:addChild(self.calGrid, 10000)
 end
 function World:getKey(x, y)
     return x*self.coff+y
@@ -82,13 +136,14 @@ end
 -- g 从start位置到当前的位置的开销
 -- h 启发从当前位置到目标位置的开销
 -- f = g+h
+-- isPath 是否路径 isReal 是否光线最短路径
 function World:initCell()
     self.cells = {}
     self.walls = {}
     self.path = {}
     for x = 1, self.cellNum, 1 do
         for y = 1, self.cellNum, 1 do
-            self.cells[x*self.coff+y] = {state=nil, fScore=nil, gScore=nil, hScore=nil, parent=nil}
+            self.cells[x*self.coff+y] = {state=nil, fScore=nil, gScore=nil, hScore=nil, parent=nil, isPath=nil, isReal=nil}
         end
     end
     for i = 0, self.cellNum+1, 1 do
@@ -156,7 +211,7 @@ function World:setBuild(x, y, size, btype, obj)
 						dis = dy
 					else
 						self.cells[self:getKey(i, j)]['state'] = 'Building'
-                        print("Place"..i.." "..j )
+                        --print("Place"..i.." "..j )
 					end
 					if dis then
 						local prevGrid = self.prevGrids[self:getKey(i, j)]
@@ -171,6 +226,7 @@ function World:setBuild(x, y, size, btype, obj)
 			end
 		end
 	end
+    self:showGrid()
 end
 
 --清理建筑物的网格
@@ -416,7 +472,7 @@ function World:search()
         	end
             break    
         else
-            self.cells[parent]['state'] = 'Path'
+            self.cells[parent]['isPath'] = true
             table.insert(self.path, {x, y})
         end
         parent = self.cells[parent]["parent"]
@@ -537,7 +593,7 @@ function World:searchAttack(range, fx, fy)
         	end
             break    
         else
-            self.cells[parent]['state'] = 'Path'
+            self.cells[parent]['isPath'] = true
             table.insert(self.path, {x, y})
         end
         parent = self.cells[parent]["parent"]

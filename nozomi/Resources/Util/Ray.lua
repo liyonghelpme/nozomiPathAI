@@ -91,8 +91,9 @@ function Ray:checkCollision()
         tar1 = tar1*self.world.cellSize
 
         table.insert(self.checkedGrid, {x, y})
-        
-        if self.world.cells[self.world:getKey(x, y)]['state'] == 'Wall' then
+        --增加新的建筑类型 需要增加新的障碍物判断
+        --state == Wall Solid Building 
+        if self.world.cells[self.world:getKey(x, y)]['state'] ~= nil then
             return true
         end
     end

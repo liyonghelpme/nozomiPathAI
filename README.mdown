@@ -1,4 +1,17 @@
 配置windows工程可以在 本机器上编译
+
 避免循环依赖问题
+
 liblua 代码
+
 cocoslua 代码放到 nozomi工程里面
+
+使用说明
+
+主要修改了lua 代码
+
+1首先确保自身的lua代码加入了版本控制  git的根位置在nozomi件夹平级
+
+2接着获得 4个修改的commit 的path  在Patch件夹
+
+3使用git apply Patch 将所有Patch 应用到lua件中  注意Patch 件夹要放到你要打patch的工程

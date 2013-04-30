@@ -24,6 +24,7 @@ path = w:search()
 
 ]]--
 function World:ctor(cellNum, coff)
+    self.calGrid = nil
     self.startPoint = nil
     self.endPoint = nil
     self.cellNum = cellNum
@@ -36,6 +37,41 @@ function World:ctor(cellNum, coff)
     self.allBuilds = {}
     self.prevGrids = {}
     self.typeNum = {}
+    
+    --当前只在攻击的时候使用该方法
+    --当前帧是否已经搜索过路径
+    self.searchYet = false
+    --根据性能设定最大允许的每帧搜索士兵数量
+    self.maxSearchNum = 1
+    self.searchNum = 0
+    self.passTime = 0
+    self.frameRate = 0.016
+
+end
+--更新搜索状态 每固定时间 限制寻路的士兵数量
+function World:update(dt)
+    --print("update World State")
+    self.searchYet = false
+    self.searchNum = 0
+end
+--showGrid 显示每个网格的值
+function World:showGrid()
+    if self.calGrid ~= nil then
+        self.calGrid:removeFromParentAndCleanup(true)
+        self.calGrid = nil
+    end
+    self.calGrid = CCNode:create()
+    for x = 1, self.cellNum, 1 do
+        for y = 1, self.cellNum, 1 do
+            local key = self:getKey(x, y)
+            if self.cells[key]['fScore'] ~= nil then
+                local temp = CCLabelTTF:create(self.cells[key]['fScore'].."", "Arial", 10)
+                self.calGrid:addChild(temp)
+                temp:setPosition(x*40, y*40)
+            end
+        end
+    end
+    CCDirector:sharedDirector():getRunningScene():addChild(self.calGrid)
 end
 function World:getKey(x, y)
     return x*self.coff+y
@@ -56,10 +92,10 @@ function World:initCell()
         end
     end
     for i = 0, self.cellNum+1, 1 do
-        self.cells[0*self.coff+i] = {state='SOLID', fScore=nil, gScore=nil, hScore=nil, parent=nil}
-        self.cells[i*self.coff+0] = {state='SOLID', fScore=nil, gScore=nil, hScore=nil, parent=nil}
-        self.cells[(self.cellNum+1)*self.coff+i] = {state='SOLID', fScore=nil, gScore=nil, hScore=nil, parent=nil}
-        self.cells[i*self.coff+(self.cellNum+1)] = {state='SOLID', fScore=nil, gScore=nil, hScore=nil, parent=nil}
+        self.cells[0*self.coff+i] = {state='Solid', fScore=nil, gScore=nil, hScore=nil, parent=nil}
+        self.cells[i*self.coff+0] = {state='Solid', fScore=nil, gScore=nil, hScore=nil, parent=nil}
+        self.cells[(self.cellNum+1)*self.coff+i] = {state='Solid', fScore=nil, gScore=nil, hScore=nil, parent=nil}
+        self.cells[i*self.coff+(self.cellNum+1)] = {state='Solid', fScore=nil, gScore=nil, hScore=nil, parent=nil}
     end
 end
 function World:putStart(x, y)
@@ -100,6 +136,10 @@ function World:setBuild(x, y, size, btype, obj)
 	local cp = {x+fsize, y+fsize}
 	self.typeNum[btype] = (self.typeNum[btype] or 0) + 1
 	self.allBuilds[self:getKey(x, y)] = cp
+    --for k, v in pairs(self.allBuilds) do
+    --    print("allBuilding "..self:getXY(k))
+    --end
+
 	for i=x-6, x+size+5 do
 		if i>0 and i<=self.cellNum then
 			for j=y-6, y+size+5 do
@@ -116,6 +156,7 @@ function World:setBuild(x, y, size, btype, obj)
 						dis = dy
 					else
 						self.cells[self:getKey(i, j)]['state'] = 'Building'
+                        print("Place"..i.." "..j )
 					end
 					if dis then
 						local prevGrid = self.prevGrids[self:getKey(i, j)]
@@ -179,9 +220,13 @@ function World:calcG(x, y)
     --当前可以绕过5个城墙
     if data['state'] == 'Wall' then
         dist = 50
+    elseif data['state'] == 'Building' then
+        dist = 500
     elseif difX > 0 and difY > 0 then
         dist = 14
     end
+    --print("calG "..dist)
+
 
     data['gScore'] = self.cells[parent]['gScore']+dist
 end
@@ -226,7 +271,11 @@ function World:checkNeibor(x, y)
     for n, nv in ipairs(neibors) do
         local key = self:getKey(nv[1], nv[2]) 
         --对于城墙value+5
-        if self.closedList[key] == nil and self.cells[key]['state'] ~= 'SOLID' and self.cells[key]['state'] ~= 'Building'  then
+
+        --如果邻居点 是 终点则不用考虑 该点是否是Building 或者solid
+        --(self.closedList[key] == nil and self.cells[key]['state'] ~= 'SOLID' and self.cells[key]['state'] ~= 'Building')  then
+        --and nv[1] == self.endPoint[1] and nv[2] == self.endPoint[2]
+        if self.closedList[key] == nil and self.cells[key]['state'] ~= 'Solid'  then  
             -- 检测是否已经在 openList 里面了
             local nS = self.cells[key]['fScore']
             local inOpen = false
@@ -282,6 +331,7 @@ function World:checkNeibor(x, y)
         end
     end
     self.closedList[self:getKey(x, y)] = true
+    --self:showGrid()
 end
 function World:getXY(pos)
     return math.floor(pos/self.coff), pos%self.coff
@@ -310,10 +360,25 @@ function World:search()
 	if tempStart[2] then
 		self.startPoint[2], tempStart[2] = tempStart[2], self.startPoint[2]
 	end
+
     self.cells[self:getKey(self.startPoint[1], self.startPoint[2])]['gScore'] = 0
     self:calcH(self.startPoint[1], self.startPoint[2])
     self:calcF(self.startPoint[1], self.startPoint[2])
     self:pushQueue(self.startPoint[1], self.startPoint[2])
+
+    local startData = self.cells[self:getKey(self.startPoint[1], self.startPoint[2])]
+    local endData = self.cells[self:getKey(self.endPoint[1], self.endPoint[2])]
+    print("start search " .. self.startPoint[1] .. " " .. self.startPoint[2] .." "..self.endPoint[1].." "..self.endPoint[2])
+    if startData['state'] == nil then
+        print("startState nil")
+    else
+        print("startState"..startData['state'])
+    end
+    if endData['state'] == nil then
+        print('endState nil')
+    else
+        print("endState "..endData['state'])
+    end
 
     --获取openList 中第一个fScore
     while #(self.openList) > 0 do
@@ -360,6 +425,10 @@ function World:search()
 end
 
 function World:searchAttack(range, fx, fy)
+    self.searchNum = self.searchNum + 1
+    if self.searchNum >= self.maxSearchNum then
+        self.searchYet = true
+    end
     self.openList = {}
     self.pqDict = {}
     self.closedList = {}

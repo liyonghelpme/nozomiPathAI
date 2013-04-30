@@ -1,5 +1,6 @@
 require "Mould.Person"
 
+
 SoldierHelper = {}
 
 SoldierHelper.headPos = {[1]={x=4, y=10}, [2]={x=1, y=10}, [3]={x=-19, y=9}, [4]={x=-2, y=9}, [5]={x=0,y=11}, 
@@ -154,6 +155,7 @@ function Soldier:getFrameEspecially(i)
 	return i
 end
 
+--士兵四周闲逛
 function Soldier:setMoveArround(build)
 	if build == nil then
 		build = self.moveArround
@@ -166,6 +168,7 @@ function Soldier:setMoveArround(build)
 			self.view:setPosition(self:getMoveArroundPosition(build))
 		end
 		self:setMoveTarget(self:getMoveArroundPosition(build))
+        print("setMoveArround ")
 	end
 end
 		
@@ -212,48 +215,53 @@ end
 function Soldier:executeAttack()
 	self.attackTarget:damage(self.stateInfo.attackValue)
 end
+function Soldier:searchAttack()
+    local target
+    local w = self.scene.mapWorld
+    if not w.searchYet then
+        local truePath
+        
+        -- 获取起点，都相同
+        local fx, fy = self.view:getPosition()
+        local grid = self.scene.mapGrid:convertToGrid(fx, fy, 1, 2)
+        local startPoint = {grid.gridPosX, grid.gridPosY}
+    
+        w:clearWorld()
+        w:putStart(startPoint[1], startPoint[2])
+        --print("test1")
 
+        local path, target, lastPoint = w:searchAttack(self.info.range*2, grid.gridFloatX, grid.gridFloatY)
+        if lastPoint then
+            local position = self.scene.mapGrid:convertToPosition(lastPoint[1]/2, lastPoint[2]/2)
+            local tx, ty = position[1] , position[2]
+            truePath = self:getTruePath(path, w, self.scene.mapGrid, fx, fy, tx, ty)
+        end	
+        --print("test2")
+            
+        if target then
+            self.attackTarget = target
+            if truePath then
+                local firstPoint = table.remove(truePath, 1)
+                self.stateInfo = {movePath = truePath}
+                if self.state~=PersonState.STATE_MOVING then
+                    self.stateTime = 0
+                end
+                self:moveDirect(firstPoint[1], firstPoint[2], true)
+            else
+                self:setAttack()
+                return true
+            end
+        else
+            self:setDeadView()
+        end
+    end
+end
 function Soldier:updateState(diff)
 	if self.isFighting then
 		if BattleLogic.battleEnd then
 			self:setDeadView()
 		elseif not self.attackTarget or self.attackTarget.buildMould.buildState==BuildStates.STATE_DESTROY then
-			local target
-			local w = self.scene.mapWorld
-			local truePath
-			
-			-- 获取起点，都相同
-			local fx, fy = self.view:getPosition()
-			local grid = self.scene.mapGrid:convertToGrid(fx, fy, 1, 2)
-			local startPoint = {grid.gridPosX, grid.gridPosY}
-		
-			w:clearWorld()
-			w:putStart(startPoint[1], startPoint[2])
-			--print("test1")
-			local path, target, lastPoint = w:searchAttack(self.info.range*2, grid.gridFloatX, grid.gridFloatY)
-			if lastPoint then
-				local position = self.scene.mapGrid:convertToPosition(lastPoint[1]/2, lastPoint[2]/2)
-				local tx, ty = position[1] , position[2]
-				truePath = self:getTruePath(path, w, self.scene.mapGrid, fx, fy, tx, ty)
-			end	
-			--print("test2")
-				
-			if target then
-				self.attackTarget = target
-				if truePath then
-					local firstPoint = table.remove(truePath, 1)
-					self.stateInfo = {movePath = truePath}
-					if self.state~=PersonState.STATE_MOVING then
-						self.stateTime = 0
-					end
-					self:moveDirect(firstPoint[1], firstPoint[2], true)
-				else
-					self:setAttack()
-					return true
-				end
-			else
-				self:setDeadView()
-			end
+            self:searchAttack()
 		elseif self.state == PersonState.STATE_FREE then
 			self:setAttack()
 			return true

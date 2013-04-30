@@ -45,6 +45,8 @@ function CastleScene:ctor()
 	local w = World.new(84, 1000)
 	w:initCell()
 	self.mapWorld = w
+
+    self.updateEntry = nil
 end
 
 function CastleScene:initView()
@@ -347,10 +349,15 @@ function CastleScene:enterOrExit(isEnter)
 		if not self.monitorId then
 			self.monitorId = EventManager.registerEventMonitor(self.monitorEvents, self.eventHandler, self)
 		end
+        local updateWorld = function(diff) 
+            self.mapWorld:update(diff)
+        end
+        self.updateEntry = CCDirector:sharedDirector():getScheduler():scheduleScriptFunc(updateWorld, 0, false)
 	else
 		self.isShow = false
 		EventManager.removeEventMonitor(self.monitorId)
 		self.monitorId = nil
+        CCDirector:sharedDirector():getScheduler():unscheduleScriptEntry(self.updateEntry)
 	end
 end
 

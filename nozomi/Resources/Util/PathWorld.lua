@@ -13,6 +13,11 @@ function PathWorld:ctor(min, max)
     self.cells = {}
     self.hdata = {}
     self.walls = {}
+
+    --当前帧 是否搜索名额已经满了
+    self.searchYet = false
+    --每帧最多的搜索士兵数量 根据具体性能设定
+    self.maxSearchNum = 3
 end
 
 function PathWorld:getKey(x, y)
@@ -221,6 +226,7 @@ function World:search()
     self:calcH(self.startPoint[1], self.startPoint[2])
     self:calcF(self.startPoint[1], self.startPoint[2])
     self:pushQueue(self.startPoint[1], self.startPoint[2])
+
 
     --获取openList 中第一个fScore
     while #(self.openList) > 0 do

@@ -52,6 +52,11 @@ function Soldier:ctor(sid, setting)
 	end
 	self.isFighting = params.isFighting
 	self.plistFile = "animate/soldiers/soldier" .. self.info.sid .. "_" .. level .. ".plist"
+
+    --当士兵距离军旗较远距离的时候
+    --设定移动目标之后 等待移动时间 之后再次检测距离
+    self.moveTime = 0
+    self.moveYet = false
 end
 	
 function Soldier:getInitPos()
@@ -167,8 +172,12 @@ function Soldier:setMoveArround(build)
 		if false then
 			self.view:setPosition(self:getMoveArroundPosition(build))
 		end
-		self:setMoveTarget(self:getMoveArroundPosition(build))
-        print("setMoveArround ")
+
+        local w = self.scene.mapWorld
+        if not w.searchYet then
+            self:setMoveTarget(self:getMoveArroundPosition(build))
+            --print("setMoveArround ")
+        end
 	end
 end
 		
@@ -256,6 +265,65 @@ function Soldier:searchAttack()
         end
     end
 end
+function Soldier:attackOther()
+    local action = self.stateInfo.action
+    if not action then
+        print("error")
+    end
+    local pb = string.find(action, "attack")
+    if pb==1 then
+        if self.stateInfo.attackTime and self.stateInfo.attackTime<self.stateTime then
+            self.stateInfo.attackTime = nil
+            self:executeAttack()
+        end
+        if not self.deleted and self.stateInfo.actionTime < self.stateTime then
+            self:setAttack()
+            return true
+        end
+     end
+end
+--一旦士兵距离军旗距离较远的话 士兵需要立即归队
+--如何判定士兵距离建筑物很远呢？
+--300*300 距离可以调整
+--如果士兵正在近距离移动 则更新移动时间 
+function Soldier:searchBusiness(dt)
+    if self.state == PersonState.STATE_FREE then
+	    local fx, fy = self.view:getPosition()
+        local tx, ty = self:getMoveArroundPosition(self.moveArround)
+        if self.moveYet then
+            self.moveTime = self.moveTime + dt
+            if self.moveTime >= 1.0 then
+                self.moveYet = false
+                self.moveTime = 0
+            end
+        end
+        if (fx-tx)*(fx-tx)+(fy-ty)*(fy-ty) >= 300*300 then
+            if not self.moveYet then
+                local w = self.scene.mapWorld
+                if not w.searchYet then
+                    self.moveYet = true
+                    self.moveTime = 0
+                    self:setMoveArround()
+                end
+            end
+        elseif self.stateTime > getParam("soldierFreeTime", 1500)/1000 then
+            self.stateTime = 0
+            if math.random()>0.5 then
+                self:setMoveArround()
+                return true
+            end
+        end
+    elseif self.state == PersonState.STATE_OTHER and self.stateTime > self.stateInfo.actionTime then
+        if self.stateInfo.action=="pose" then
+            self.stateTime = 0
+            self.state = PersonState.STATE_FREE
+            self.stateInfo.action = "free"
+            self.direction = 1
+        end
+        self:resetPersonView()
+        return true
+    end
+end
 function Soldier:updateState(diff)
 	if self.isFighting then
 		if BattleLogic.battleEnd then
@@ -266,44 +334,13 @@ function Soldier:updateState(diff)
 			self:setAttack()
 			return true
 		elseif self.state == PersonState.STATE_OTHER then
-		 	local action = self.stateInfo.action
-		 	if not action then
-		 		print("error")
-		 	end
-		 	local pb = string.find(action, "attack")
-		 	if pb==1 then
-			 	if self.stateInfo.attackTime and self.stateInfo.attackTime<self.stateTime then
-			 		self.stateInfo.attackTime = nil
-			 		self:executeAttack()
-			 	end
-		 		if not self.deleted and self.stateInfo.actionTime < self.stateTime then
-			 		self:setAttack()
-			 		return true
-			 	end
-			 end
+            self:attackOther()
 		end
 		if diff==0 then
 			-- 入场后的掉落动画，先不实现
 		end
 	else
-		if self.state == PersonState.STATE_FREE then
-			if self.stateTime > getParam("soldierFreeTime", 1500)/1000 then
-				self.stateTime = 0
-				if math.random()>0.5 then
-					self:setMoveArround()
-					return true
-				end
-			end
-		elseif self.state == PersonState.STATE_OTHER and self.stateTime > self.stateInfo.actionTime then
-			if self.stateInfo.action=="pose" then
-				self.stateTime = 0
-				self.state = PersonState.STATE_FREE
-				self.stateInfo.action = "free"
-				self.direction = 1
-			end
-			self:resetPersonView()
-			return true
-		end
+        self:searchBusiness(diff)
 	end
 end
 

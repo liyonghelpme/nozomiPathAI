@@ -339,6 +339,11 @@ end
 
 
 function World:search()
+    self.searchNum = self.searchNum + 1
+    if self.searchNum >= self.maxSearchNum then
+        self.searchYet = true
+    end
+
     self.openList = {}
     self.pqDict = {}
     self.closedList = {}
@@ -368,7 +373,8 @@ function World:search()
 
     local startData = self.cells[self:getKey(self.startPoint[1], self.startPoint[2])]
     local endData = self.cells[self:getKey(self.endPoint[1], self.endPoint[2])]
-    print("start search " .. self.startPoint[1] .. " " .. self.startPoint[2] .." "..self.endPoint[1].." "..self.endPoint[2])
+    --print("start search " .. self.startPoint[1] .. " " .. self.startPoint[2] .." "..self.endPoint[1].." "..self.endPoint[2])
+    --[[
     if startData['state'] == nil then
         print("startState nil")
     else
@@ -379,6 +385,7 @@ function World:search()
     else
         print("endState "..endData['state'])
     end
+    ]]--
 
     --获取openList 中第一个fScore
     while #(self.openList) > 0 do

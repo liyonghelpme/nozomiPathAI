@@ -85,6 +85,9 @@ end
 --我的affine坐标和梁浩然游戏内部的坐标的 x y 方向相反了 
 
 function World:showGrid()
+    if not self.debug then
+        return
+    end
     -- 0 0 坐标点位置
     local zx = 2080
     local zy = 195
@@ -126,6 +129,8 @@ function World:showGrid()
         end
     end
     self.scene.ground:addChild(self.calGrid, 10000)
+    --是否显示调试块
+    self.debug = false
 end
 function World:getKey(x, y)
     return x*self.coff+y
